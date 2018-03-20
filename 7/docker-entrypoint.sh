@@ -17,10 +17,16 @@ _gotpl() {
 init_ssh_client() {
     _gotpl "ssh_config.tpl" "${ssh_dir}/config"
 
-    if [[ -n "${SSH_PRIVATE_KEY}" ]]; then
-        _gotpl "id_rsa.tpl" "${ssh_dir}/id_rsa"
+
+    if [[ -f "${HOST_SSH_KEY_PATH}" ]]; then
+        cp ${HOST_SSH_KEY_PATH} ~/.ssh/id_rsa
         chmod -f 600 "${ssh_dir}/id_rsa"
-        unset SSH_PRIVATE_KEY
+    else
+        if [[ -n "${SSH_PRIVATE_KEY}" ]]; then
+            _gotpl "id_rsa.tpl" "${ssh_dir}/id_rsa"
+            chmod -f 600 "${ssh_dir}/id_rsa"
+            unset SSH_PRIVATE_KEY
+        fi
     fi
 }
 
