@@ -19,7 +19,7 @@ init_ssh_client() {
 
 
     if [[ -f "${HOST_SSH_KEY_PATH}" ]]; then
-        cp ${HOST_SSH_KEY_PATH} ~/.ssh/id_rsa
+        cp ${HOST_SSH_KEY_PATH} "${ssh_dir}/id_rsa"
         chmod -f 600 "${ssh_dir}/id_rsa"
     else
         if [[ -n "${SSH_PRIVATE_KEY}" ]]; then
