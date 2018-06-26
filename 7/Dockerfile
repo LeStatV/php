@@ -15,16 +15,18 @@ ENV PHP_DEV="${PHP_DEV}" \
     WALTER_VER="1.3.0" \
     \
     EXT_AMQP_VER="1.9.3" \
-    EXT_APCU_VER="5.1.10" \
+    EXT_APCU_VER="5.1.11" \
     EXT_AST_VER="0.1.6" \
     EXT_DS_VER="1.2.4" \
     EXT_GEOIP_VER="1.1.1" \
-    EXT_GRPC_VER="1.9.0" \
+    EXT_GRPC_VER="1.10.0" \
+    EXT_IGBINARY_VER="2.0.5" \
     EXT_IMAGICK_VER="3.4.3" \
     EXT_MEMCACHED_VER="3.0.4" \
     EXT_MONGODB_VER="1.4.0" \
     EXT_OAUTH_VER="2.0.2" \
     EXT_REDIS_VER="3.1.6" \
+    EXT_TIDEWAYS_XHPROF_VER="4.1.6" \
     EXT_XDEBUG_VER="2.6.0" \
     EXT_YAML_VER="2.0.2" \
     \
@@ -33,8 +35,10 @@ ENV PHP_DEV="${PHP_DEV}" \
     C_CLIENT_VER="2007f-r7" \
     FREETYPE_VER="2.8.1-r2" \
     GEOIP_VER="1.6.11-r0" \
+    GMP_VER="6.1.2-r1" \
     ICU_LIBS_VER="59.1-r1" \
     IMAGEMAGICK_VER="7.0.7.11-r1" \
+    JPEGOPTIM_VER="1.4.4-r0" \
     LIBBZ2_VER="1.0.6-r6" \
     LIBJPEG_TURBO_VER="1.5.2-r0" \
     LIBLDAP_VER="2.4.45-r3" \
@@ -43,16 +47,20 @@ ENV PHP_DEV="${PHP_DEV}" \
     LIBMCRYPT_VER="2.5.8-r7" \
     LIBPNG_VER="1.6.34-r1" \
     LIBXSLT_VER="1.1.31-r0" \
-    MARIADB_CLIENT_VER="10.1.28-r1" \
-    POSTGRESQL_CLIENT_VER="10.3-r0" \
+    MARIADB_CLIENT_VER="10.1.32-r0" \
+    POSTGRESQL_CLIENT_VER="10.4-r0" \
     RABBITMQ_C_VER="0.8.0-r3" \
-    YAML_VER="0.1.7-r0"
+    TIDYHTML_VER="5.4.0-r0" \
+    YAML_VER="0.1.7-r0" \
+    \
+    LD_PRELOAD="/usr/lib/preloadable_libiconv.so php"
 
 ENV APP_ROOT="/var/www/html" \
     CONF_DIR="/var/www/conf" \
     FILES_DIR="/mnt/files" \
-    PATH="/home/wodby/.composer/vendor/bin:${PATH}" \
+    PATH="${PATH}:/home/wodby/.composer/vendor/bin" \
     SSHD_HOST_KEYS_DIR="/etc/ssh" \
+    ENV="/home/wodby/.shrc" \
     \
     GIT_USER_EMAIL="wodby@example.com" \
     GIT_USER_NAME="wodby"
@@ -69,7 +77,6 @@ RUN set -xe; \
 	adduser -u "${WODBY_USER_ID}" -D -S -s /bin/bash -G wodby wodby; \
 	adduser wodby www-data; \
 	sed -i '/^wodby/s/!/*/' /etc/shadow; \
-	echo "PS1='\w\$ '" >> /home/wodby/.bashrc; \
     \
     apk add --update --no-cache -t .php-rundeps \
         "c-client=${C_CLIENT_VER}" \
@@ -78,8 +85,10 @@ RUN set -xe; \
         "freetype=${FREETYPE_VER}" \
         "geoip=${GEOIP_VER}" \
         git \
+        "gmp=${GMP_VER}" \
         "icu-libs=${ICU_LIBS_VER}" \
         "imagemagick=${IMAGEMAGICK_VER}" \
+        "jpegoptim=${JPEGOPTIM_VER}" \
         less \
         "libbz2=${LIBBZ2_VER}" \
         "libjpeg-turbo=${LIBJPEG_TURBO_VER}" \
@@ -101,6 +110,7 @@ RUN set -xe; \
         rsync \
         su-exec \
         sudo \
+        "tidyhtml-libs=${TIDYHTML_VER}" \
         tig \
         tmux \
         "yaml=${YAML_VER}"; \
@@ -112,6 +122,7 @@ RUN set -xe; \
         bzip2-dev \
         freetype-dev \
         geoip-dev \
+        gmp-dev \
         icu-dev \
         imagemagick-dev \
         imap-dev \
@@ -126,7 +137,10 @@ RUN set -xe; \
         pcre-dev \
         postgresql-dev \
         rabbitmq-c-dev \
+        tidyhtml-dev \
         yaml-dev; \
+    \
+    apk add -U -X http://dl-cdn.alpinelinux.org/alpine/edge/testing/ --allow-untrusted gnu-libiconv; \
     \
     # Install redis-cli.
     apk add --update --no-cache redis; \
@@ -138,11 +152,18 @@ RUN set -xe; \
     \
     docker-php-source extract; \
     \
+    # Fix for tidy extension.
+    if [[ "${PHP_VERSION:0:3}" == "7.0" ]]; then \
+        cd /usr/src/php; \
+        sed -i 's/buffio.h/tidybuffio.h/' ext/tidy/*.c; \
+    fi; \
+    \
     docker-php-ext-install \
         bcmath \
         bz2 \
         calendar \
         exif \
+        gmp \
         imap \
         intl \
         ldap \
@@ -152,9 +173,9 @@ RUN set -xe; \
         pdo_mysql \
         pdo_pgsql \
         pgsql \
-        phar \
         soap \
         sockets \
+        tidy \
         xmlrpc \
         xsl \
         zip; \
@@ -194,9 +215,11 @@ RUN set -xe; \
     pecl install \
         "amqp-${EXT_AMQP_VER}" \
         "apcu-${EXT_APCU_VER}" \
+        "ast-${EXT_AST_VER}" \
         "ds-${EXT_DS_VER}" \
         "geoip-${EXT_GEOIP_VER}" \
         "grpc-${EXT_GRPC_VER}" \
+        "igbinary-${EXT_IGBINARY_VER}" \
         "imagick-${EXT_IMAGICK_VER}" \
         "memcached-${EXT_MEMCACHED_VER}" \
         "mongodb-${EXT_MONGODB_VER}" \
@@ -208,7 +231,9 @@ RUN set -xe; \
     docker-php-ext-enable \
         amqp \
         apcu \
+        ast \
         ds \
+        igbinary \
         imagick \
         geoip \
         grpc \
@@ -230,15 +255,13 @@ RUN set -xe; \
     mkdir -p /usr/src/php/ext/uploadprogress; \
     up_url="https://github.com/wodby/pecl-php-uploadprogress/archive/latest.tar.gz"; \
     wget -qO- "${up_url}" | tar xz --strip-components=1 -C /usr/src/php/ext/uploadprogress; \
-    docker-php-ext-configure uploadprogress; \
     docker-php-ext-install uploadprogress; \
     \
-    # AST
-    mkdir -p /usr/src/php/ext/ast; \
-    ast_url="https://github.com/nikic/php-ast/archive/v${EXT_AST_VER}.tar.gz"; \
-    wget -qO- "${ast_url}" | tar xz --strip-components=1 -C /usr/src/php/ext/ast; \
-    docker-php-ext-configure ast; \
-    docker-php-ext-install ast; \
+    # Tideways xhprof
+    mkdir -p /usr/src/php/ext/xhprof; \
+    xhprof_url="https://github.com/tideways/php-xhprof-extension/archive/v${EXT_TIDEWAYS_XHPROF_VER}.tar.gz"; \
+    wget -qO- "${xhprof_url}" | tar xz --strip-components=1 -C /usr/src/php/ext/xhprof; \
+    docker-php-ext-install xhprof; \
     \
     # Install composer
     wget -qO- https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer; \
@@ -251,8 +274,14 @@ RUN set -xe; \
     wget -qO- "${walter_url}" | tar xz -C /tmp/; \
     mv /tmp/walter_linux_amd64/walter /usr/local/bin; \
     \
-    # Make sure PATH is correct for drush ssh.
-    su-exec wodby echo "export PATH=${PATH}" > /home/wodby/.profile; \
+    { \
+        echo 'export PS1="\u@${WODBY_APP_NAME:-php}.${WODBY_ENVIRONMENT_NAME:-container}:\w $ "'; \
+        # Make sure PATH is the same for ssh sessions.
+        echo "export PATH=${PATH}"; \
+    } | tee /home/wodby/.shrc; \
+    \
+    # Make sure bash uses the same settings as ash.
+    cp /home/wodby/.shrc /home/wodby/.bashrc; \
     \
     # Configure sudoers
     { \
@@ -263,8 +292,9 @@ RUN set -xe; \
         else \
             echo -n 'wodby ALL=(root) NOPASSWD:SETENV: ' ; \
             echo -n '/usr/local/bin/files_chmod, ' ; \
+            echo -n '/usr/local/bin/files_chown, ' ; \
             echo -n '/usr/local/bin/files_sync, ' ; \
-            echo -n '/usr/local/bin/gen-ssh-keys.sh, ' ; \
+            echo -n '/usr/local/bin/gen_ssh_keys, ' ; \
             echo -n '/usr/local/bin/init_volumes, ' ; \
             echo -n '/usr/local/bin/migrate, ' ; \
             echo -n '/usr/local/sbin/php-fpm, ' ; \
@@ -323,7 +353,7 @@ RUN set -xe; \
     \
     if [[ -z "${PHP_DEV}" ]]; then \
         rm -rf /usr/src/php.tar.xz; \
-    fi;
+    fi
 
 USER wodby
 
@@ -335,4 +365,4 @@ COPY docker-entrypoint.sh /
 COPY bin /usr/local/bin/
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["sudo", "-E", "php-fpm"]
+CMD ["sudo", "-E", "LD_PRELOAD=/usr/lib/preloadable_libiconv.so", "php-fpm"]
