@@ -28,6 +28,11 @@ init_ssh_client() {
             unset SSH_PRIVATE_KEY
         fi
     fi
+    
+    if [ ! -z "${SSH_GIT_SECRET}" ]; then
+        echo ${SSH_GIT_SECRET} > /home/wodby/.git-credentials
+        git config --global credential.helper store
+    fi
 }
 
 init_sshd() {
